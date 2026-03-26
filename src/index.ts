@@ -14,6 +14,27 @@ import notificationRoutes from "./routes/notificationRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 
 dotenv.config();
+
+// ✅ ENV validation (FIXED)
+const requiredEnvVars = [
+  "MONGO_URI",
+  "JWT_SECRET",
+  "REFRESH_TOKEN_SECRET",
+  "EMAIL_USER",
+  "EMAIL_PASS",
+  "CLOUDINARY_CLOUD_NAME",
+  "CLOUDINARY_API_KEY",
+  "CLOUDINARY_API_SECRET",
+];
+
+const missing = requiredEnvVars.filter((v) => !process.env[v]);
+
+if (missing.length > 0) {
+  console.error("❌ Missing ENV:", missing);
+  throw new Error("Missing required environment variables"); // ✅ FIX
+}
+
+// ✅ DB connect
 connectDB();
 
 const app = express();
@@ -21,23 +42,10 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
-// ✅ CORS setup for localhost + frontend
-const allowedOrigins = [
-  process.env.FRONTEND_URL, 
-  process.env.LOCALHOST_URL
-];
-
 app.use(
   cors({
-    origin: function(origin, callback) {
-      if (!origin) return callback(null, true); // Postman or server-to-server
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      } else {
-        return callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true, // cookies allow
+    origin: process.env.FRONTEND_URL,
+    credentials: true,
   })
 );
 
@@ -51,20 +59,20 @@ app.use("/api/branches", branchRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/notifications", notificationRoutes);
 
-// Health check
+// Health
 app.get("/", (req, res) => res.send("API Running"));
+
 app.get("/health", (req, res) => {
   res.status(200).json({
     status: "healthy",
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || "development"
   });
 });
 
 // Error handler
 app.use(errorHandler);
 
-// ✅ Vercel export
+// ✅ IMPORTANT: export handler (Vercel)
 export default function handler(req: any, res: any) {
   return app(req, res);
 }
