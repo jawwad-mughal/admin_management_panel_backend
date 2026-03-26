@@ -7,7 +7,8 @@ import crypto from "crypto";
 import { sendEmail } from "../utils/sendEmail";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || "refresh-secret-key";
+const REFRESH_TOKEN_SECRET =
+  process.env.REFRESH_TOKEN_SECRET || "refresh-secret-key";
 
 // 🔐 Generate Access Token (15 minutes) - Include user data
 const normalizeBranch = (branch: any) => {
@@ -19,41 +20,59 @@ const normalizeBranch = (branch: any) => {
 };
 
 const generateAccessToken = (user: any) => {
-  return jwt.sign({ 
-    id: user._id.toString(),
-    _id: user._id.toString(),
-    email: user.email,
-    role: user.role,
-    permissions: user.permissions || [],
-    branch: normalizeBranch(user.branch),
-    admin: user.admin ? user.admin.toString() : user._id.toString()
-  }, JWT_SECRET, { expiresIn: "15m" });
+  return jwt.sign(
+    {
+      id: user._id.toString(),
+      _id: user._id.toString(),
+      email: user.email,
+      role: user.role,
+      permissions: user.permissions || [],
+      branch: normalizeBranch(user.branch),
+      admin: user.admin ? user.admin.toString() : user._id.toString(),
+    },
+    JWT_SECRET,
+    { expiresIn: "15m" },
+  );
 };
 
 // 🔄 Generate Refresh Token (7 days)
 const generateRefreshToken = (user: any) => {
-  return jwt.sign({ 
-    id: user._id.toString(),
-    _id: user._id.toString(),
-    email: user.email,
-    role: user.role,
-    permissions: user.permissions || [],
-    branch: normalizeBranch(user.branch),
-    admin: user.admin ? user.admin.toString() : user._id.toString()
-  }, REFRESH_TOKEN_SECRET, { expiresIn: "7d" });
+  return jwt.sign(
+    {
+      id: user._id.toString(),
+      _id: user._id.toString(),
+      email: user.email,
+      role: user.role,
+      permissions: user.permissions || [],
+      branch: normalizeBranch(user.branch),
+      admin: user.admin ? user.admin.toString() : user._id.toString(),
+    },
+    REFRESH_TOKEN_SECRET,
+    { expiresIn: "7d" },
+  );
 };
 
 // ================= SIGNUP =================
 export const signup = async (req: Request, res: Response) => {
   try {
-    const { name, email, password, phone, countryCode, dialCode, flag } = req.body;
+    const { name, email, password, phone, countryCode, dialCode, flag } =
+      req.body;
 
-    if (!name || !email || !password || !phone || !countryCode || !dialCode || !flag) {
+    if (
+      !name ||
+      !email ||
+      !password ||
+      !phone ||
+      !countryCode ||
+      !dialCode ||
+      !flag
+    ) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
     const userExists = await User.findOne({ email });
-    if (userExists) return res.status(400).json({ message: "User already exists" });
+    if (userExists)
+      return res.status(400).json({ message: "User already exists" });
 
     const hashed = await bcrypt.hash(password, 10);
 
@@ -80,19 +99,18 @@ export const signup = async (req: Request, res: Response) => {
     user.refreshToken = refreshToken;
     await user.save();
 
-    // Set tokens in cookies
     res.cookie("accessToken", accessToken, {
       httpOnly: true,
-      secure: false,
-      sameSite: "lax",
-      maxAge: 15 * 60 * 1000, // 15 minutes
+      secure: process.env.NODE_ENV === "production", // HTTPS on Vercel
+      sameSite: "none", // cross-origin required
+      maxAge: 15 * 60 * 1000,
     });
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      secure: false,
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "none",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     const userWithoutPassword = {
@@ -104,7 +122,7 @@ export const signup = async (req: Request, res: Response) => {
       dialCode: user.dialCode,
       flag: user.flag,
       role: user.role,
-      permissions: user.permissions
+      permissions: user.permissions,
     };
 
     res.status(201).json({
@@ -144,15 +162,31 @@ export const login = async (req: Request, res: Response) => {
     const rolePerms: Record<string, string[]> = {
       Admin: ["admin:full_access"],
       BranchManager: [
-        "products:read", "products:create", "products:update",
-        "categories:read", "categories:create", "categories:update",
-        "orders:read", "orders:create", "orders:update",
-        "users:read", "users:create", "users:update",
-        "branches:read", "branches:update",
-        "reports:read"
+        "products:read",
+        "products:create",
+        "products:update",
+        "categories:read",
+        "categories:create",
+        "categories:update",
+        "orders:read",
+        "orders:create",
+        "orders:update",
+        "users:read",
+        "users:create",
+        "users:update",
+        "branches:read",
+        "branches:update",
+        "reports:read",
       ],
-      Employee: ["products:read", "categories:read", "orders:read", "orders:create", "orders:update", "reports:read"],
-      User: ["products:read", "categories:read", "orders:read"]
+      Employee: [
+        "products:read",
+        "categories:read",
+        "orders:read",
+        "orders:create",
+        "orders:update",
+        "reports:read",
+      ],
+      User: ["products:read", "categories:read", "orders:read"],
     };
 
     // Ensure permissions are always assigned based on role
@@ -170,16 +204,16 @@ export const login = async (req: Request, res: Response) => {
 
     res.cookie("accessToken", accessToken, {
       httpOnly: true,
-      secure: false,
-      sameSite: "lax",
-      maxAge: 15 * 60 * 1000, // 15 minutes
+      secure: process.env.NODE_ENV === "production", // HTTPS on Vercel
+      sameSite: "none", // cross-origin required
+      maxAge: 15 * 60 * 1000,
     });
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      secure: false,
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "none",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     const userWithoutPassword: any = {
@@ -192,7 +226,7 @@ export const login = async (req: Request, res: Response) => {
       countryCode: user.countryCode,
       dialCode: user.dialCode,
       flag: user.flag,
-      branch: user.branch
+      branch: user.branch,
     };
 
     res.json({
@@ -201,7 +235,6 @@ export const login = async (req: Request, res: Response) => {
       accessToken,
       refreshToken,
     });
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
@@ -285,14 +318,14 @@ export const refreshToken = async (req: Request, res: Response) => {
 
     res.cookie("accessToken", newAccessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 15 * 60 * 1000, // 15 minutes
     });
 
     res.cookie("refreshToken", newRefreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
@@ -302,10 +335,11 @@ export const refreshToken = async (req: Request, res: Response) => {
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
     });
-
   } catch (error: any) {
     if (error.name === "TokenExpiredError") {
-      return res.status(401).json({ message: "Refresh token expired. Please login again" });
+      return res
+        .status(401)
+        .json({ message: "Refresh token expired. Please login again" });
     }
     if (error.name === "JsonWebTokenError") {
       return res.status(401).json({ message: "Invalid refresh token" });
@@ -315,12 +349,9 @@ export const refreshToken = async (req: Request, res: Response) => {
   }
 };
 
-
 // ================= FORGOT PASSWORD =================
 export const forgotPassword = async (req: Request, res: Response) => {
-
   try {
-
     const { email } = req.body;
 
     // Check User collection first, then Admin collection
@@ -340,7 +371,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
     await user.save();
 
-    const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+    const baseUrl = process.env.APP_URL || "http://localhost:3000";
     const resetLink = `${baseUrl}/reset-password/${resetToken}`;
 
     await sendEmail(
@@ -356,35 +387,28 @@ export const forgotPassword = async (req: Request, res: Response) => {
       </a>
 
       <p>This link will expire in 10 minutes.</p>
-      `
+      `,
     );
 
     res.json({
       message: "Reset link sent to your email",
     });
-
   } catch (error) {
-
     console.log(error);
     res.status(500).json({ message: "Server error" });
-
   }
-
 };
-
 
 // ================= RESET PASSWORD =================
 export const resetPassword = async (req: Request, res: Response) => {
-
   try {
-
     const { token } = req.params;
     const { password } = req.body;
 
     // Check User collection
     const user = await User.findOne({
       resetToken: token,
-      resetTokenExpire: { $gt: new Date() }
+      resetTokenExpire: { $gt: new Date() },
     });
 
     if (!user) {
@@ -400,12 +424,10 @@ export const resetPassword = async (req: Request, res: Response) => {
     await user.save();
 
     res.json({
-      message: "Password reset successful"
+      message: "Password reset successful",
     });
-
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Server error" });
   }
-
 };
